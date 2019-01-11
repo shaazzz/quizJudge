@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            td {
+              border: 1px solid black;
+              height : 20px;
+              width : 20px;
+              text-align: center;
+              border-radius : 7px;
+              color: #cccccc;
+            }
+            .filled {
+                background : black;
+                color: black;
+            }
+            .judge_ans {
+                background: #aaffaa;
+            }
+            .you_wrong {
+                color: red;
+                font-weight: bold;
+            }
+            .you_correct {
+                color: green;
+                font-weight: bold;
+            }
+            th {
+                height : 20px;
+                width : 20px;
+            }
+        </style>
+    </head>
+    <body dir="rtl">
+        <div id="sLogin">
+            <input id="username"></input><br>
+            <input id="password" type="password"></input><br>
+            <input id="login" type="Button" text="Login"></input>
+            <a href="/signup">ثبت نام</a>
+        </div>
+        <div id="sBefore">
+            <a id="register" href="#" onclick="register()">با نام و یاد خدا آزمون را شروع می کنم .</a>
+        </div>
+        <div id="sNow">
+            زمان باقیمانده :
+            <span id="remain"></span><br>
+            <a href="/soorat_soala">صورت سوالات</a>
+            <table dir="ltr" style="margin:auto" id="pasokhname">
+                
+            </table> 
+            <a href="#" onclick="finish()">آزمون را تمام کن</a>
+        </div>
+        <div id="sAfter">
+            
+           آزمون به پایان رسیده است . نمره شما : 
+            <span id="nomre"></span>
+            <table dir="ltr" style="margin:auto" id="pasokh_kelid">
+                
+            </table>
+        </div>
+        <script>
+            var $ = x => document.getElementById(x);
+            var state = "sLogin";
+            var states = ["sLogin","sBefore","sNow","sAfter"];
+            var user = {};
+            var serverData = {};
+            states.forEach(x=>$(x).style.display = 'none');
+            $(state).style.display = 'block';
+            $('login').onclick = async ()=>{
+                user.username = $('username').value;
+                user.password = $('password').value;
+                await reload();
+            };
+            
+            fetchServerData().then(()=>{
+                buildTable('pasokhname');
+                buildTable('pasokh_kelid');
+            });  
+            
+            function changeState(x){
+                $(state).style.display = 'none';
+                state = x;
+                $(state).style.display = 'block';
+            }
+            
+            async function register(){
+                await fetch("/reg?username="+user.username+"&password="+user.password,{method:'POST'}).then(res=>{
+                    if (res.status == 403){
+                        return 'login failed';
+                    }
+                    return res.json();
+                });
+                await reload();
+            }
+            
+            async function finish(){
+                if (!window.confirm('آیا اطمینان دارید؟ دیگر نمی توانید به آزمون ادامه دهید.')) return;
+                await fetch("/finish?username="+user.username+"&password="+user.password,{method:'POST'}).then(res=>{
+                    if (res.status == 403){
+                        return 'login failed';
+                    }
+                    return res.json();
+                });
+                await reload();
+            }
+            
+            async function fetchServerData(){
+                serverData = await fetch("/public_data").then(res=>res.json());
+                console.log(serverData);
+                serverData.diff = serverData.time - (new Date).valueOf();
+            }
+            
+            function serverTime(){
+                return (new Date).valueOf()+serverData.diff;
+            }
+            
+            async function fetchAnswer(){
+                data = await fetch("/answer?username="+user.username+"&password="+user.password).then(res=>{
+                    if (res.status == 403){
+                        return 'f';    
+                    }
+                    return res.json();
+                });
+                return data;
+            }
+            
+            function calcPercent(a,b){
+                return a.split('').map((x,i)=>(x=='0'?0:(x==b[i]?4:-1))).reduce((a,b)=>a+b)*100/(4*serverData.contest.questionCount);
+            }
+            
+            async function reload(){
+                user = await fetch("/mydata?username="+user.username+"&password="+user.password).then(res=>{
+                    if (res.status == 403){
+                        return 'login failed';    
+                    }
+                    return res.json();
+                });
+                if (user == 'login failed'){
+                    user = {};
+                    changeState('sLogin');
+                    return;
+                }
+                if (!user.start){
+                    changeState('sBefore');
+                    return;
+                }
+                if (serverTime()-user.start>serverData.contest.duration){
+                    changeState('sAfter');
+                    serverData.contest.answer = await fetchAnswer();
+                    if (serverData.contest.answer.res == "unavailable"){
+                        $('nomre').innerHTML = serverData.contest.answer.msg;
+                        render('pasokh_kelid',user.key);
+                        return;
+                    }
+                    $('nomre').innerHTML = calcPercent(user.key,serverData.contest.answer.key)+'%';
+                    render2('pasokh_kelid',user.key,serverData.contest.answer.key);
+                    return;
+                }
+                changeState('sNow');
+                render('pasokhname',user.key);
+            }
+            
+            async function onClick(i,j){
+                if (user.key[i]==j) j='0';
+                await fetch("/submit?username="+user.username+"&password="+user.password+"&soal="+i+"&answer="+j,{method:'POST'}).then(res=>{
+                    if (res.status == 403){
+                        return 'login failed';
+                    }
+                    return res.json();
+                });
+                await reload();
+            }
+            
+            function buildTable(tid){
+                let onClicker = (i,j) => (()=>onClick(i,j));
+                let t = $(tid);
+                while (t.firstChild) {
+                    t.removeChild(t.firstChild);
+                }
+                for (let i=0;i<serverData.contest.questionCount;i++){
+                    let tr = document.createElement('tr');
+                    let th = document.createElement('th');
+                    th.innerHTML = ""+(i+1);
+                    tr.appendChild(th);
+                    for (let j=0;j<5;j++){
+                        let td = document.createElement('td');
+                        td.id = tid+'_'+i+'_'+(j+1);
+                        td.onclick = onClicker(i,j+1);
+                        td.innerHTML = ""+(j+1);
+                        tr.appendChild(td);
+                    }
+                    t.appendChild(tr);
+                }
+            }
+            
+            function render(tid,key){
+                for (let i=0;i<serverData.contest.questionCount;i++){
+                    for (let j=0;j<5;j++){
+                        $(tid+'_'+i+'_'+(j+1)).className = 'simple';
+                    }
+                }
+                key.split('').forEach((j,i)=>{
+                    if (j=='0') return;
+                    $(tid+'_'+i+'_'+j).className = 'filled';
+                });
+            }
+            
+            function render2(tid,key,judge){
+                for (let i=0;i<serverData.contest.questionCount;i++){
+                    for (let j=0;j<5;j++){
+                        $(tid+'_'+i+'_'+(j+1)).className = 'simple';
+                    }
+                }
+                key.split('').forEach((j,i)=>{
+                    if (j==judge[i]) $(tid+'_'+i+'_'+j).className = 'judge_ans you_correct';
+                    else{
+                        console.log(j);
+                        if (j != 0){
+                            console.log(j);
+                            $(tid+'_'+i+'_'+j).className = 'you_wrong';
+                        }
+                        $(tid+'_'+i+'_'+judge[i]).className = 'judge_ans';
+                    }
+                });
+            }
+            
+            function sleep(ms) {
+              return new Promise(resolve => setTimeout(resolve, ms));
+            }
+            
+            function printTime(ms){
+                let pretty = (x) => (x<10?"0"+x:""+x);
+                let div = (x) => ms = Math.floor(ms/x);
+                div(1000);
+                let s = ms%60;
+                div(60);
+                let m = ms%60;
+                div(60);
+                let h = ms%24;
+                div(24);
+                return pretty(h)+':'+pretty(m)+':'+pretty(s);
+            }
+            
+            async function timer(){
+                if (state == 'sNow'){
+                    $('remain').innerHTML = printTime(serverData.contest.duration-serverTime()+user.start);
+                }
+                await sleep(1000);
+                timer();
+            }
+            timer();
+        </script>
+    </body>
+</html>

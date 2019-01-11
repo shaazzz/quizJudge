@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            td {
+              border: 1px solid black;
+              height : 20px;
+              width : 20px;
+              text-align: center;
+              border-radius : 7px;
+              color: #000000;
+            }
+            .filled {
+                background : black;
+                color: black;
+            }
+            .judge_ans {
+                background: #aaffaa;
+            }
+            .you_wrong {
+                color: red;
+                font-weight: bold;
+            }
+            .you_correct {
+                color: green;
+                font-weight: bold;
+            }
+            th {
+                height : 20px;
+                width : 20px;
+            }
+        </style>
+    </head>
+    <body dir="rtl">
+        <div id="sLogin">
+            <input id="password" type="password"></input><br>
+            <input id="login" type="Button" text="Login"></input>
+        </div>
+        <div id="sMain">
+            <table id="scoreboard"></table>
+        </div>
+        <script>
+            var $ = x => document.getElementById(x);
+            var state = "sLogin";
+            var states = ["sLogin","sMain"];
+            var serverData = {};
+            states.forEach(x=>$(x).style.display = 'none');
+            $(state).style.display = 'block';
+            var password="";
+            $('login').onclick = async ()=>{
+                password = $('password').value;
+                await reload();
+            };
+       
+            function changeState(x){
+                $(state).style.display = 'none';
+                state = x;
+                $(state).style.display = 'block';
+            }
+       
+            function calcPercent(a,b){
+                return a.split('').map((x,i)=>(x=='0'?0:(x==b[i]?4:-1))).reduce((a,b)=>a+b)*100/(4*serverData.contest.questionCount);
+            }
+            
+            async function reload(){
+                serverData = await fetch("/adminData?password="+password).then(res=>{
+                    if (res.status == 403){
+                        return 'login failed';    
+                    }
+                    return res.json();
+                });
+                if (serverData == 'login failed'){
+                    user = {};
+                    changeState('sLogin');
+                    return;
+                }
+                changeState('sMain');
+                serverData.users.forEach(user=>user.score = calcPercent(user.key,serverData.secret.answer.key));
+                serverData.users.sort((a,b)=>(b.score-a.score));
+                serverData.users.forEach((user,rotbe)=>{
+                    let x = document.createElement('tr');
+                    let rot = document.createElement('th');
+                    rot.innerHTML = rotbe+1;
+                    x.appendChild(rot);
+                    let nam = document.createElement('th');
+                    nam.innerHTML = user.username;
+                    x.appendChild(nam);
+                    let score = document.createElement('th');
+                    score.innerHTML = user.score;
+                    x.appendChild(score);
+                    user.key.split('').forEach((v,i)=>{
+                        let o = document.createElement('td');
+                        o.style.background = (v==0?'White':(v==serverData.secret.answer.key[i]?'Green':'Red'));
+                        o.innerHTML = v;
+                        x.appendChild(o);
+                    });
+                    $('scoreboard').appendChild(x);
+                });
+            }
+            
+            function sleep(ms) {
+              return new Promise(resolve => setTimeout(resolve, ms));
+            }
+            
+            function printTime(ms){
+                let pretty = (x) => (x<10?"0"+x:""+x);
+                let div = (x) => ms = Math.floor(ms/x);
+                div(1000);
+                let s = ms%60;
+                div(60);
+                let m = ms%60;
+                div(60);
+                let h = ms%24;
+                div(24);
+                return pretty(h)+':'+pretty(m)+':'+pretty(s);
+            }
+            
+            async function timer(){
+                if (state == 'sNow'){
+                    $('remain').innerHTML = printTime(serverData.contest.duruation-serverTime()+user.start);
+                }
+                await sleep(1000);
+                timer();
+            }
+            timer();
+        </script>
+    </body>
+</html>
