@@ -125,7 +125,9 @@
             }
             
             function calcPercent(a,b){
-                return a.split('').map((x,i)=>(x=='0'?0:(x==b[i]?4:-1))).reduce((a,b)=>a+b)*100/(4*serverData.contest.questionCount);
+                let hazf = b.split('').map(x=>x=='0').reduce((a,b)=>a+b);
+                let score = a.split('').map((x,i)=>((x=='0' || b[i]=='0')?0:(x==b[i]?4:-1))).reduce((a,b)=>a+b)*100;
+                return score/(4*(serverData.contest.questionCount-hazf));
             }
             
             async function reload(){
@@ -212,6 +214,10 @@
                     }
                 }
                 key.split('').forEach((j,i)=>{
+                    if (judge[i]=='0'){
+                        for (let j=1;j<=5;j++) $(tid+'_'+i+'_'+j).className = 'filled';
+                        return;
+                    }
                     if (j==judge[i]) $(tid+'_'+i+'_'+j).className = 'judge_ans you_correct';
                     else{
                         console.log(j);

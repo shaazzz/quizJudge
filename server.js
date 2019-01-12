@@ -112,7 +112,7 @@ app.get('/answer',(req,res)=>{
 	res.status(403).end('fail login');
 	return;
     }
-    if (!user.start || (new Date).valueOf()-user.start<contest.duruation){
+    if (!user.start || (new Date).valueOf()-user.start<contest.duration){
 	res.status(403).end('out of Time');
 	return;
     }
@@ -127,7 +127,7 @@ app.post('/submit',(req,res)=>{
 	res.status(403).end('fail login');
 	return;
     }
-    if (!user.start || (new Date).valueOf()-user.start>contest.duruation){
+    if (!user.start || (new Date).valueOf()-user.start>contest.duration){
 	res.status(403).end('out of Time');
 	return;
     }

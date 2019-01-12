@@ -59,7 +59,9 @@
             }
        
             function calcPercent(a,b){
-                return a.split('').map((x,i)=>(x=='0'?0:(x==b[i]?4:-1))).reduce((a,b)=>a+b)*100/(4*serverData.contest.questionCount);
+                let hazf = b.split('').map(x=>x=='0').reduce((a,b)=>a+b);
+                let score = a.split('').map((x,i)=>((x=='0' || b[i]=='0')?0:(x==b[i]?4:-1))).reduce((a,b)=>a+b)*100;
+                return score/(4*(serverData.contest.questionCount-hazf));
             }
             
             async function reload(){
@@ -91,6 +93,7 @@
                     user.key.split('').forEach((v,i)=>{
                         let o = document.createElement('td');
                         o.style.background = (v==0?'White':(v==serverData.secret.answer.key[i]?'Green':'Red'));
+                        if (serverData.secret.answer.key[i]=='0') o.style.background = 'Black';
                         o.innerHTML = v;
                         x.appendChild(o);
                     });
